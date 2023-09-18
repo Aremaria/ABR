@@ -26,8 +26,8 @@ hyperparameters = {
     'sample': {'colsample_bytree': [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0], # из-за переобучения снизили
                 'subsample': [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]},
                                                         
-    'bagging': {'feature_fraction': [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9], # из-за переобучения снизили
-                'bagging_fraction': [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]},
+    # 'bagging': {'feature_fraction': [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+    #            'bagging_fraction': [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]},
     
     'learning_rate': {'learning_rate': [0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3]}            
     }
@@ -61,7 +61,7 @@ def EstimationClass(model, X, y):
 
 def search_params(model, X_train, y_train, hyperparameters, scor):
     for key, params in hyperparameters.items():
-        grid = GridSearchCV(model, params, scoring=scor, cv=5, n_jobs=-1) # сюда Kfold
+        grid = GridSearchCV(model, params, scoring=scor, cv=5, verbose=0, n_jobs=-1) # сюда Kfold
         grid.fit(X_train, y_train)
         
         print(f"Best score: {grid.best_score_} with parameters: {grid.best_params_}")
@@ -120,23 +120,28 @@ def MakeModel(df, model_columns, target, pca_col, bestparams, scor):
     for col in comp_list:
         col_weih = importance['importance'].loc[importance['features'] == col].values[0]
         df_importance[col] = df_importance[col] * col_weih
-        
-    # переписать в статмент
-    df_importance['importance'] = df_importance.sum(axis=1)
-    df_importance['features'] = [t.split(', ')[-1] for t in pca_col]
-    df_importance['flag'] = 'ABdetail'
+
+    df_importance = df_importance.assign(
+        importance=df_importance.sum(axis=1),
+        features=[t.split(', ')[-1] for t in pca_col],
+        flag='ABdetail'
+    )
+
+    df_importance_piv = (
+        pd.pivot_table(df_importance, values='importance', index='features', aggfunc=np.sum)
+        .reset_index()
+        .assign(flag='ABall')
+    )
     
-    df_importance_piv = pd.pivot_table(df_importance, values=['importance'], index=['features'], aggfunc=np.sum).reset_index()
-    df_importance_piv['flag'] = 'ABall'
-    
-    df_importance['features'] = df_importance.index
-    df_importance = df_importance[['flag','features','importance']].reset_index(drop=True)
-    df_importance_piv = df_importance_piv[['flag','features','importance']].reset_index(drop=True)
-    
-    importance =  importance.loc[importance['features'].isin(comp_list) == False].reset_index(drop=True)
-    importance.insert(0, 'flag', 'init')    
+    df_importance = df_importance.assign(features=df_importance.index)[['flag', 'features', 'importance']]
+
+    importance = (
+        importance.loc[~importance['features'].isin(comp_list)]
+        .assign(flag='init')
+    )
+
     importance = pd.concat([importance, df_importance, df_importance_piv]).reset_index(drop=True)
-       
+
     return scaler, model_lgb, importance, pca_model, X_pca_scaled
 
 def PairResult(df_ABR_model, df_DDD_model, dict_data, min_year, lag, ab, org, scor, StepNum, typesave): # расчет результата по паре        

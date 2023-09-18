@@ -6,7 +6,6 @@ import streamlit as st
 import lightgbm as lgb
 
 
-
 def LoadDataModel(): # загрузка данных для моделирования
     df_ABR_model = pd.read_csv('./DATA/ABR_model.csv', index_col=0)
     df_DDD_model = pd.read_csv('./DATA/DDDs_model.csv', index_col=0) 

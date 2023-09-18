@@ -1,4 +1,4 @@
-#streamlit run D:/SpyderProjects/OTHERS/app.py
+#streamlit run D:/585/PYprojects/ABR/app.py
 
 import streamlit as st
 st.set_page_config(layout="wide", page_title='resistance', page_icon='https://w7.pngwing.com/pngs/984/359/png-transparent-antimicrobial-stewardship-antimicrobial-resistance-antibiotics-health-care-others-thumbnail.png')
@@ -8,15 +8,15 @@ from pic import PicSens, PicFitting, PicDDD, PicForecast, PicDistrMetricApp, Pic
 from LoadData import LoadDataApp, LoadTablesApp, LoadDataAppNoDDD
 
 
-appdir = 'D:/SpyderProjects/OTHERS'
-dict_list = {'Escherichia coli' : ['CEFOTAXIME','CEFEPIME'],}
+appdir = '.'
+dict_list = {'Escherichia coli': ['CEFOTAXIME', 'CEFEPIME']}
 set_list = ('Full', 'Model', 'Valid')
 
 pairs_list = MakeListPair(dict_list)
 ab_coeff, df_ABR_init, dict_molecula, df_forecastDDD = LoadTablesApp(appdir) #  прогноз DDD, коэффициэнты для прогноза DDD
 
 # --------------------------
-tab0, tab1, tab2, tab3, tab4 = st.tabs(['Validation', 'Fitting', 'Simulation', 'Consumptions','Forecast']) 
+tab0, tab1, tab2, tab3, tab4 = st.tabs(['Validation', 'Fitting', 'Simulation', 'Consumptions', 'Forecast'])
 pairname = st.sidebar.selectbox('Pair:', pairs_list, index=0)
 ab = pairname.split('_')[1]
 ab_class = dict_molecula['AntibioticClass'].loc[dict_molecula['AntibioticName'] == ab].values[0]
