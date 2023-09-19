@@ -5,7 +5,6 @@ import json
 import streamlit as st
 import lightgbm as lgb
 
-
 def LoadDataModel(): # загрузка данных для моделирования
     df_ABR_model = pd.read_csv('./DATA/ABR_model.csv', index_col=0)
     df_DDD_model = pd.read_csv('./DATA/DDDs_model.csv', index_col=0) 
@@ -39,9 +38,7 @@ def SaveDataModel(pairname, vecs, typeparam): # сохранение данны�
     pickle.dump(pca_model_final, open(f'''./results/pca/{(pairname + '_' + typeparam + '.pkl')}''','wb'))
     df_full.to_csv(f'''./results/data/{(pairname + '_' + typeparam + '.csv')}''')
     json.dump(dict_model, open(f'''./results/model/{(pairname + '_' + typeparam + '_dict.txt')}''','w')) 
-   
-    # base.to_csv(f'''./results/base/{(pairname + '_base.csv')}''')
-    #json.dump(bestparams, open(f'''./results/model/{(pairname + '_dict.txt')}''','w')) 
+
 
 @st.cache
 def LoadDataAppNoDDD(pairname, appdir): # подгрузка данных для приложения no ddd
@@ -89,7 +86,6 @@ def LoadTablesApp(appdir): # подгрузка данных для прилож
 
 @st.cache
 def LoadDataForecastApp(appdir, pairname, typeparam): # прогрузка данных для формирвоания прогноза - не используется
-    # base = pd.read_csv(f'''{appdir}/results/base/{(pairname + '_base.csv')}''', index_col=0).reset_index(drop=True)
     dict_data = json.loads(open(f'''{appdir}/DATA/dict_feat.txt''').read()) 
         
     model = lgb.Booster(model_file=str(f'''{appdir}/results/model/{(pairname + '_' + typeparam + '.txt')}'''))    

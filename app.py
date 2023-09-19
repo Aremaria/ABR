@@ -24,10 +24,13 @@ org = pairname.split('_')[0]
 
 if pairname:  
     # анализ чуст-ти, важности факторов, точности и рез-ты фитирования, прогноз
-    df_sens_all, importance_all, pd_acc_all, stat_year_all, stat_region_all, df_pair_ddd_all, forecast_all, forecasts_ddd_all = LoadDataApp(pairname, appdir, 'all')
-    df_sens_filt, importance_filt, pd_acc_filt, stat_year_filt, stat_region_filt, df_pair_ddd_filt, forecast_filt, forecasts_ddd_filt = LoadDataApp(pairname, appdir, 'filt')
+    df_sens_all, importance_all, pd_acc_all, stat_year_all, stat_region_all, df_pair_ddd_all, forecast_all, forecasts_ddd_all = LoadDataApp(
+        pairname, appdir, 'all')
+
+    df_sens_filt, importance_filt, pd_acc_filt, stat_year_filt, stat_region_filt, df_pair_ddd_filt, forecast_filt, forecasts_ddd_filt = LoadDataApp(
+        pairname, appdir, 'filt')
+
     pd_acc_noDDD, stat_year_noDDD, stat_region_noDDD = LoadDataAppNoDDD(pairname, appdir)
-    
     df_ddd_hospital_all, df_ddd_retail_all, ab_list = MakeDDD(df_forecastDDD, df_pair_ddd_all)
     df_ddd_hospital_filt, df_ddd_retail_filt, _ = MakeDDD(df_forecastDDD, df_pair_ddd_filt)
    
@@ -89,8 +92,7 @@ if pairname:
         st.text('filt ---------------------------------------------------------------------------------------------------------------------------------------------------------')
         PicSens(importance_filt, df_sens_filt, ab_class, perc)
 
-# -------------------   consumption   
-# сюда добавить оптимальные ddd         
+# -------------------   consumption
     with tab3:
         col1, col2 = st.columns([1, 5])
         with col1:
@@ -117,8 +119,7 @@ if pairname:
         with col1:    
             st.text('all factors ---------')
             
-        with col2:  
-            # написать сюда максимальную разницу - скорость падения в год
+        with col2:
             PicForecast(forecast_all, stat_year_all)
             
         col3, col4 = st.columns([1, 4])

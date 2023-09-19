@@ -5,7 +5,7 @@ import copy
 from sklearn.metrics import confusion_matrix
 from lightgbm import LGBMClassifier
 from sklearn.model_selection import GridSearchCV
-from sklearn.model_selection import train_test_split # mean_squared_error
+from sklearn.model_selection import train_test_split
 
 from functions import ScalerTransform, ChangeDfPCA, MakeTrain, MakeStatCuts, MakeData, MakeTableDDD
 from SensAnalysis import SensAn
@@ -25,10 +25,7 @@ hyperparameters = {
         
     'sample': {'colsample_bytree': [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0], # из-за переобучения снизили
                 'subsample': [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]},
-                                                        
-    # 'bagging': {'feature_fraction': [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
-    #            'bagging_fraction': [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]},
-    
+
     'learning_rate': {'learning_rate': [0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3]}            
     }
 
@@ -59,9 +56,9 @@ def EstimationClass(model, X, y):
        
     return recall, precision, acc 
 
-def search_params(model, X_train, y_train, hyperparameters, scor):
+def search_params(model, X_train, y_train, hyperparameters, scor): # кросс-валидация 5-fold
     for key, params in hyperparameters.items():
-        grid = GridSearchCV(model, params, scoring=scor, cv=5, verbose=0, n_jobs=-1) # сюда Kfold
+        grid = GridSearchCV(model, params, scoring=scor, cv=5, verbose=0, n_jobs=-1)
         grid.fit(X_train, y_train)
         
         print(f"Best score: {grid.best_score_} with parameters: {grid.best_params_}")
@@ -70,7 +67,7 @@ def search_params(model, X_train, y_train, hyperparameters, scor):
     return model
 
 
-def calibration(df_model, model_columns, pca_col, target, hyperparameters, scor): # настройка гиперпараметров, калибровка не нужна частая - переодически запускать и следить
+def calibration(df_model, model_columns, pca_col, target, hyperparameters, scor): # настройка гиперпараметров
     print('calibration in progres...')
        
     df_train, df_test = train_test_split(df_model, test_size=0.5, shuffle=True)
@@ -85,8 +82,8 @@ def calibration(df_model, model_columns, pca_col, target, hyperparameters, scor)
     model_best = search_params(model, X_train_pca_scaled, y_train, hyperparameters, scor) # калибруем
     model_best.fit(X_train_pca_scaled, y_train)
                 
-    recall_train, precision_train, acc_train  = EstimationClass(model_best, X_train_pca_scaled, y_train)
-    recall_test, precision_test, acc_test  = EstimationClass(model_best, X_test_pca_scaled, y_test)
+    recall_train, precision_train, acc_train = EstimationClass(model_best, X_train_pca_scaled, y_train)
+    recall_test, precision_test, acc_test = EstimationClass(model_best, X_test_pca_scaled, y_test)
 
     print('train recall:', round(recall_train*100,2), '%, train acc:', round(acc_train*100,2), '%')
     print('test recall:', round(recall_test*100,2), '%, test acc:', round(acc_test*100,2), '%')
@@ -100,7 +97,7 @@ def calibration(df_model, model_columns, pca_col, target, hyperparameters, scor)
 
 def MakeModel(df, model_columns, target, pca_col, bestparams, scor):
     X = df[model_columns]; y = df[target]        
-    X_pca_scaled, scaler, pca_model = MakeTrain(X, pca_col) # преобразование под PCA
+    X_pca_scaled, scaler, pca_model = MakeTrain(X, pca_col) # преобразование DDDs под PCA
        
     model_lgb = ModelDef() 
     
@@ -113,7 +110,7 @@ def MakeModel(df, model_columns, target, pca_col, bestparams, scor):
     # раскрываем веса признаков внутри компонент
     fact_weights = pca_model.components_
     df_importance = pd.DataFrame(abs(fact_weights)).T
-    df_importance = df_importance/df_importance.sum()
+    df_importance = df_importance / df_importance.sum()
     df_importance.index = pca_col
     comp_list = df_importance.columns.to_list()
    
@@ -121,6 +118,7 @@ def MakeModel(df, model_columns, target, pca_col, bestparams, scor):
         col_weih = importance['importance'].loc[importance['features'] == col].values[0]
         df_importance[col] = df_importance[col] * col_weih
 
+    # обработка важности признаков в разной детализации (по компонентам, препаратам)
     df_importance = df_importance.assign(
         importance=df_importance.sum(axis=1),
         features=[t.split(', ')[-1] for t in pca_col],
@@ -144,14 +142,14 @@ def MakeModel(df, model_columns, target, pca_col, bestparams, scor):
 
     return scaler, model_lgb, importance, pca_model, X_pca_scaled
 
-def PairResult(df_ABR_model, df_DDD_model, dict_data, min_year, lag, ab, org, scor, StepNum, typesave): # расчет результата по паре        
+def PairResult(df_ABR_model, df_DDD_model, dict_data, min_year, lag, ab, org, scor, StepNum, typesave): # расчет результата
     pairname = str(org) + '_' + str(ab)
     print(pairname)
     
-    common_cols = ['Year', 'Nosocomial', 'MovAvgRes']
+    common_cols = ['Year', 'Nosocomial', 'MovAvgRes'] # общие колонки (набор препаратов может меняться при разбивке)
     df_full = MakeData(df_ABR_model, dict_data, ab, org) # подготовка среза ABR для AB и Org, отсечка редких регионов 
      
-    # цикл для интервальной оценки
+    # цикл для интервальной оценки, следим за переобучением
     target = dict_data['Target']
     df_bestparams = df_metrics = stat_year = stat_region = pd.DataFrame()
     for i in range(StepNum + 1):
@@ -161,16 +159,16 @@ def PairResult(df_ABR_model, df_DDD_model, dict_data, min_year, lag, ab, org, sc
         df_model, df_valid = train_test_split(df_full, test_size=0.5, shuffle=True)
                 
         # добавляем расчетные признаки и удаляем пустые значения по каждому сету отдельно
-        # скользящие средние считаем отдельно для valid (модель ничего не знает про valid)
-        df_model, dict_ddd = FeaturesCount(df_model, df_DDD_model, df_model, dict_data, lag) # в качестве ABR выступает сам файл
-        df_valid, _ = FeaturesCount(df_valid, df_DDD_model, df_valid, dict_data, lag)
+        # скользящие средние считаем отдельно для valid (модель ничего не должна знать про valid)
+        df_model, dict_ddd = FeaturesCount(df_model, df_DDD_model, df_model, dict_data, lag) # добавляем признаки
+        df_valid, _ = FeaturesCount(df_valid, df_DDD_model, df_valid, dict_data, lag) # добавляем признаки
         
         # отсекаем по году
         df_model = df_model.loc[df_model['Year'] >= min_year].reset_index()
         df_valid = df_valid.loc[df_valid['Year'] >= min_year].reset_index()
                
         # определяем порядок столбцов
-        ddd_columns = dict_ddd['ddd_columns']
+        ddd_columns = dict_ddd['ddd_columns'] # уйдут под PCA
         model_columns = common_cols + ddd_columns
                         
         bestparams, accs = calibration(df_model, model_columns, ddd_columns, target, hyperparameters, scor) # если нужна калибровка bestparams = {} # если без калибровки
@@ -180,7 +178,7 @@ def PairResult(df_ABR_model, df_DDD_model, dict_data, min_year, lag, ab, org, sc
         recall_train, precision_train, acc_train = EstimationClass(model, X_model_pca_scaled, df_model[target])
         recall_test, precision_test, acc_test = EstimationClass(model, X_valid_pca_scaled, df_valid[target])
         
-        # точности по схлопнутым статистикам
+        # средние точности на крупных срезах (год, регион)
         stat_year_model, stat_region_model = MakeStatCuts(df_model, X_model_pca_scaled, 'Model', dict_data, model_columns, model, i)
         stat_year_valid, stat_region_valid = MakeStatCuts(df_valid, X_valid_pca_scaled, 'Valid', dict_data, model_columns, model, i)
         stat_year = pd.concat([stat_year, stat_year_model, stat_year_valid])
@@ -194,36 +192,45 @@ def PairResult(df_ABR_model, df_DDD_model, dict_data, min_year, lag, ab, org, sc
         df_metrics = pd.concat([df_metrics, row_acc])
         df_bestparams = pd.concat([df_bestparams, row_bestparams])
         
-    # обновляем гиперпараметры - усредняем по всем расчетам
+    # обновляем гиперпараметры - усредняем по всем оценкам из цикла
     bestparams_mean = df_bestparams.mean().dropna().reset_index()
     for i in range(len(bestparams_mean)):
         col = bestparams_mean['index'].iloc[i]
         col_type = type(bestparams[col])
         col_val_mean = bestparams_mean[0].iloc[i]
-        if  col_type == float: bestparams[col] = float(round(col_val_mean, 3))
-        elif  col_type == int: bestparams[col] = int(round(col_val_mean, 0))
-        else: pass
+
+        if col_type == float:
+            bestparams[col] = float(round(col_val_mean, 3))
+        elif col_type == int:
+            bestparams[col] = int(round(col_val_mean, 0))
+        else:
+            pass
             
-    # апдейтим df_full на параметры
+    # добавляем признаки к полным данным, обучаем финальную модель на рассчитанных гиперпараметрах
     df_full, dict_ddd = FeaturesCount(df_full, df_DDD_model, df_full, dict_data, lag)
     df_full = df_full.loc[df_full['Year'] >= min_year].reset_index()
     
     ddd_columns = dict_ddd['ddd_columns']
     model_columns = common_cols + ddd_columns
-    
-    scaler_final, model_final, importance, pca_model_final, X_full_pca_scaled = MakeModel(df_full, model_columns, target, ddd_columns, bestparams, scor)     
+
+    scaler_final, model_final, importance, pca_model_final, X_full_pca_scaled = MakeModel(df_full, model_columns,
+                                                                                          target, ddd_columns,
+                                                                                          bestparams, scor)
     recall, precision, acc = EstimationClass(model_final, X_full_pca_scaled, df_full[target])
     print('ful recall:', round(recall*100,2), '%, full acc:', round(acc*100,2), '%')   
             
+    # список параметров для анализа чувствителельности
     param_list = np.unique(dict_ddd['HOSPITAL']['InitDDD'] + dict_ddd['HOSPITAL']['InitDDD'])
-    df_sens = SensAn(df_full, model_columns, target, scaler_final, model_final, pca_model_final, param_list, ddd_columns) # анализ чувствительности
-    dict_model = MakeDictModel(dict_data, dict_ddd, model_columns, common_cols, lag) # формируем словарь с порядком столбцов и др переменными
-        
-    # сводная статистика
+    df_sens = SensAn(df_full, model_columns, target, scaler_final, model_final, pca_model_final, param_list, ddd_columns)
+
+    # формируем словарь с порядком столбцов и др переменными, уйдет в прогноз
+    dict_model = MakeDictModel(dict_data, dict_ddd, model_columns, common_cols, lag)
+
+    # сводная статистика на крупных срезах
     stat_year_full, stat_region_full = MakeStatCuts(df_full, X_full_pca_scaled, 'Full', dict_data, model_columns, model_final, 'full') # статистика по срезам 
     stat_year = pd.concat([stat_year, stat_year_full]) # добавляем срез для проверки по финальной модели на всем сете
     stat_region = pd.concat([stat_region, stat_region_full]) # добавляем срез для проверки по финальной модели на всем сете                  
-    df_ddd = MakeTableDDD(df_full, dict_ddd) # для статистики потребления (сравнение с общей)
+    df_ddd = MakeTableDDD(df_full, dict_ddd) # для статистики потребления (сравнение с общей), для картинки
     
     # сохранение  ----------------------------   
     df_ddd.to_excel(f'''./results/base/{(pairname + '_' + typesave + '_ddds.xlsx')}''') 

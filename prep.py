@@ -131,7 +131,9 @@ def MakeReportABR(): # обработка исходной статистики 
     df_ABR.to_csv('./DATA/ABR2.csv') 
     
     # сохранение срезовой статистики
-    piv_ABR = pd.pivot_table(df_ABR, values=['Resistance','count'], index=['Year','AntibioticName','AntibioticClass','OrganismName','Nosocomial'], aggfunc='sum').reset_index()
+    piv_ABR = pd.pivot_table(df_ABR, values=['Resistance','count'],
+                             index=['Year','AntibioticName','AntibioticClass','OrganismName','Nosocomial'],
+                             aggfunc='sum').reset_index()
     piv_ABR['res'] = piv_ABR['Resistance'] / piv_ABR['count']
     piv_ABR.index = piv_ABR['Year']
     piv_ABR = piv_ABR.drop(columns={'Year'})
@@ -147,13 +149,12 @@ def MakeFinalABR(model_unit_org, model_unit_ab): # подготовка данн
     organism_list = np.unique(organism_list[model_unit_org].loc[(organism_list['cumsum'] <= 0.9)])
     df_ABR = df_ABR.loc[df_ABR[model_unit_org].isin(organism_list) == True]
             
-    df_ABR  = df_ABR[['OrganismName', 'Nosocomial', 'AntibioticName', 'AntibioticClass', 'RegionName', 'Year', 'Resistance']] 
+    df_ABR = df_ABR[['OrganismName', 'Nosocomial', 'AntibioticName', 'AntibioticClass', 'RegionName', 'Year', 'Resistance']]
     dict_feat = {'Index': ['OrganismName', 'AntibioticName', 'AntibioticClass', 'RegionName'],
                  'DataTime': ['Year',],
                  'Target': 'Resistance',
                  'DataOthers': ['Nosocomial',]}  
-    
-    
+
     dict_feat.update({'model_unit_org': model_unit_org, 'model_unit_ab': model_unit_ab})
     
     df_ABR.to_csv('./DATA/ABR_model.csv')  # сохраняем подготовленные данные для модели
